@@ -3,15 +3,16 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useInventory } from "@/context/InventoryContext";
-import { ArrowLeft, Search, Filter, History as HistoryIcon } from "lucide-react";
+import { ArrowLeft, Search, Filter, History as HistoryIcon, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 
 export default function MaintenanceHistoryPage() {
-    const { maintenanceHistory, studios } = useInventory();
+    const { maintenanceHistory, studios, deleteMaintenanceRecord } = useInventory();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStudio, setSelectedStudio] = useState<string>("all");
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     // Filter and sort history
     const filteredHistory = useMemo(() => {
@@ -42,6 +43,16 @@ export default function MaintenanceHistoryPage() {
 
         return filtered;
     }, [maintenanceHistory, searchQuery, selectedStudio]);
+
+    const handleDeleteRecord = async (recordId: string) => {
+        try {
+            await deleteMaintenanceRecord(recordId);
+            setDeleteConfirmId(null);
+        } catch (error) {
+            console.error('Failed to delete record:', error);
+            alert('刪除失敗，請稍後再試');
+        }
+    };
 
     return (
         <div className="flex flex-col h-screen bg-background">
@@ -194,11 +205,59 @@ export default function MaintenanceHistoryPage() {
                                         <p className="text-sm text-blue-800">{record.notes}</p>
                                     </div>
                                 )}
+
+                                {/* Delete Button */}
+                                <button
+                                    onClick={() => setDeleteConfirmId(record.id)}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors active:scale-[0.98] text-sm font-medium"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    刪除此記錄
+                                </button>
                             </div>
                         ))}
                     </div>
                 )}
             </main>
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmId && (
+                <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border p-6 space-y-6 animate-in fade-in zoom-in duration-300 relative">
+                        <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="absolute top-4 right-4 p-1 text-muted-foreground hover:bg-secondary rounded-full"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                        <div className="text-center space-y-2">
+                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600">
+                                <Trash2 className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-xl font-bold">確認刪除？</h2>
+                            <p className="text-sm text-muted-foreground">
+                                此操作無法復原，確定要刪除這筆維修記錄嗎？
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="flex-1 py-3 rounded-xl border border-border bg-background text-foreground font-bold hover:bg-secondary transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={() => handleDeleteRecord(deleteConfirmId)}
+                                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                確認刪除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

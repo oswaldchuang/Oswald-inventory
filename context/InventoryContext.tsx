@@ -9,6 +9,7 @@ import {
     arrayUnion,
     arrayRemove,
     addDoc,
+    deleteDoc,
     Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -65,6 +66,7 @@ interface InventoryContextType {
         returnedBy: string,
         notes?: string
     ) => Promise<void>;
+    deleteMaintenanceRecord: (recordId: string) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -372,6 +374,42 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const deleteMaintenanceRecord = async (recordId: string) => {
+        try {
+            // Find the document in maintenance_history collection
+            const historyRef = collection(db, "maintenance_history");
+
+            // We need to find the document by the recordId
+            // Since recordId is stored as a field, we need to iterate through to find the Firebase doc ID
+            const recordToDelete = maintenanceHistory.find(record => record.id === recordId);
+
+            if (!recordToDelete) {
+                console.error('Maintenance record not found');
+                return;
+            }
+
+            // Query to find the document
+            // For simplicity, we'll delete by searching for matching fields
+            // A better approach would be to store the Firebase document ID in the record
+            const snapshot = await (await import('firebase/firestore')).getDocs(historyRef);
+            let docIdToDelete = null;
+
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.id === recordId) {
+                    docIdToDelete = doc.id;
+                }
+            });
+
+            if (docIdToDelete) {
+                await deleteDoc(doc(db, "maintenance_history", docIdToDelete));
+            }
+        } catch (error) {
+            console.error('Error deleting maintenance record:', error);
+            throw error;
+        }
+    };
+
     return (
         <InventoryContext.Provider value={{
             studios,
@@ -387,7 +425,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             removeStudioAssignee,
             addToUserHistory,
             maintenanceHistory,
-            recordMaintenanceReturn
+            recordMaintenanceReturn,
+            deleteMaintenanceRecord
         }}>
             {children}
         </InventoryContext.Provider>

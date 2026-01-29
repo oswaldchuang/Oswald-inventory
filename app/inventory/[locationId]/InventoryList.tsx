@@ -148,6 +148,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
     };
 
     const currentStatusOptions = [
+        { value: EquipmentStatus.UNCHECKED, label: "未清點", color: "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 data-[state=active]:bg-slate-500 data-[state=active]:text-white data-[state=active]:border-slate-500" },
         { value: EquipmentStatus.NORMAL, label: "正常", color: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:border-blue-600" },
         { value: EquipmentStatus.DAMAGED, label: "損壞", color: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:border-red-600" },
         { value: EquipmentStatus.LOST, label: "遺失", color: "bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100 data-[state=active]:bg-stone-600 data-[state=active]:text-white data-[state=active]:border-stone-600" },
