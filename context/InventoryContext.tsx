@@ -8,13 +8,16 @@ import {
     updateDoc,
     arrayUnion,
     arrayRemove,
+    addDoc,
+    Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Studio, Equipment, EquipmentUnit, EquipmentStatus, LabelStatus } from "@/data/types";
+import { Studio, Equipment, EquipmentUnit, EquipmentStatus, LabelStatus, MaintenanceHistory } from "@/data/types";
 
 interface InventoryContextType {
     studios: Studio[];
     userHistory: string[];
+    maintenanceHistory: MaintenanceHistory[];
     loading: boolean;
     updateUnitStatus: (
         studioId: string,
@@ -54,6 +57,14 @@ interface InventoryContextType {
     addStudioAssignee: (studioId: string, assignee: string) => Promise<void>;
     removeStudioAssignee: (studioId: string, assignee: string) => Promise<void>;
     addToUserHistory: (name: string) => void;
+    recordMaintenanceReturn: (
+        studioId: string,
+        equipmentId: string,
+        unitId: string,
+        previousStatus: EquipmentStatus,
+        returnedBy: string,
+        notes?: string
+    ) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -63,6 +74,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const [rawStudios, setRawStudios] = useState<any[]>([]);
     const [equipmentMap, setEquipmentMap] = useState<Map<string, Equipment[]>>(new Map());
     const [unitsMap, setUnitsMap] = useState<Map<string, EquipmentUnit[]>>(new Map());
+    const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistory[]>([]);
     const [userHistory, setUserHistory] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -169,6 +181,36 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
             setUnitsMap(map);
             setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    // Subscribe to maintenance history
+    useEffect(() => {
+        const historyRef = collection(db, "maintenance_history");
+        const unsubscribe = onSnapshot(historyRef, (snapshot) => {
+            const historyData: any[] = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                historyData.push({
+                    id: data.id,
+                    unitId: data.unitId,
+                    equipmentId: data.equipmentId,
+                    equipmentName: data.equipmentName,
+                    unitLabel: data.unitLabel,
+                    studioId: data.studioId,
+                    studioName: data.studioName,
+                    previousStatus: data.previousStatus,
+                    sentToMaintenanceAt: data.sentToMaintenanceAt?.toDate(),
+                    sentBy: data.sentBy,
+                    returnedAt: data.returnedAt?.toDate(),
+                    returnedBy: data.returnedBy,
+                    notes: data.notes || '',
+                    createdAt: data.createdAt?.toDate(),
+                });
+            });
+            setMaintenanceHistory(historyData);
         });
 
         return () => unsubscribe();
@@ -293,6 +335,43 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const recordMaintenanceReturn = async (
+        studioId: string,
+        equipmentId: string,
+        unitId: string,
+        previousStatus: EquipmentStatus,
+        returnedBy: string,
+        notes?: string
+    ) => {
+        // Find unit details
+        const studio = rawStudios.find((s: any) => s.id === studioId);
+        const equipment = equipmentMap.get(studioId)?.find((e: Equipment) => e.id === equipmentId);
+        const unit = unitsMap.get(equipmentId)?.find((u: EquipmentUnit) => u.id === unitId);
+
+        if (!studio || !equipment || !unit) {
+            console.error('Unable to find studio, equipment, or unit for maintenance record');
+            return;
+        }
+
+        const historyRef = collection(db, "maintenance_history");
+        await addDoc(historyRef, {
+            id: `${unitId}_${Date.now()}`,
+            unitId: unitId,
+            equipmentId: equipment.id,
+            equipmentName: equipment.name,
+            unitLabel: unit.unitLabel,
+            studioId: studioId,
+            studioName: studio.name,
+            previousStatus: previousStatus,
+            sentToMaintenanceAt: Timestamp.now(),
+            sentBy: returnedBy,
+            returnedAt: Timestamp.now(),
+            returnedBy: returnedBy,
+            notes: notes || '',
+            createdAt: Timestamp.now(),
+        });
+    };
+
     return (
         <InventoryContext.Provider value={{
             studios,
@@ -306,7 +385,9 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             updateStudioAssignee,
             addStudioAssignee,
             removeStudioAssignee,
-            addToUserHistory
+            addToUserHistory,
+            maintenanceHistory,
+            recordMaintenanceReturn
         }}>
             {children}
         </InventoryContext.Provider>

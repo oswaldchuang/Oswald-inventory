@@ -3,7 +3,8 @@ export enum EquipmentStatus {
     NORMAL = '正常',
     DAMAGED = '損壞',
     LOST = '遺失',
-    MAINTENANCE = '外出拍攝'
+    MAINTENANCE = '外出拍攝',
+    REPAIRED = '已維修'
 }
 
 export enum LabelStatus {
@@ -51,4 +52,23 @@ export interface Studio {
     assignee?: string; // Deprecated: Single person responsible
     assignees?: string[]; // List of people checking
     equipment: Equipment[];
+}
+
+export interface MaintenanceHistory {
+    id: string;
+    unitId: string;
+    equipmentId: string;
+    equipmentName: string;
+    unitLabel: string;
+    studioId: string;
+    studioName: string;
+    // Previous status before sent to maintenance
+    previousStatus: EquipmentStatus;
+    // Maintenance record
+    sentToMaintenanceAt: Date;
+    sentBy: string;
+    returnedAt: Date;
+    returnedBy: string;
+    notes?: string;
+    createdAt: Date;
 }

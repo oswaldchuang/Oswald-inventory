@@ -22,7 +22,8 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         updateUnitLabelRemark,
         updateUnitRemark,
         addStudioAssignee,
-        removeStudioAssignee
+        removeStudioAssignee,
+        recordMaintenanceReturn
     } = useInventory();
 
     const studio = studios.find(s => s.id === studioId);
@@ -49,6 +50,13 @@ export default function InventoryList({ studioId }: InventoryListProps) {
     const [selectedUnitIndex, setSelectedUnitIndex] = useState<number>(0);
     const [nameInput, setNameInput] = useState("");
     const [showNameModal, setShowNameModal] = useState(false);
+    const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+    const [maintenanceNotes, setMaintenanceNotes] = useState("");
+    const [pendingMaintenanceUnit, setPendingMaintenanceUnit] = useState<{
+        equipmentId: string;
+        unitId: string;
+        previousStatus: EquipmentStatus;
+    } | null>(null);
 
     const toggleNameModal = () => setShowNameModal(!showNameModal);
 
@@ -64,9 +72,49 @@ export default function InventoryList({ studioId }: InventoryListProps) {
     // Helper to check if we can perform actions
     const canEdit = !!currentUser;
 
-    const handleStatusChange = (status: EquipmentStatus, equipmentId: string, unitId: string) => {
+    const handleStatusChange = (status: EquipmentStatus, equipmentId: string, unitId: string, currentStatus: EquipmentStatus) => {
         if (!currentUser) return;
-        updateUnitStatus(studioId, equipmentId, unitId, status, currentUser);
+
+        // If changing to REPAIRED, show maintenance notes modal
+        if (status === EquipmentStatus.REPAIRED) {
+            setPendingMaintenanceUnit({
+                equipmentId,
+                unitId,
+                previousStatus: currentStatus
+            });
+            setMaintenanceNotes("");
+            setShowMaintenanceModal(true);
+        } else {
+            updateUnitStatus(studioId, equipmentId, unitId, status, currentUser);
+        }
+    };
+
+    const handleConfirmMaintenance = async () => {
+        if (!currentUser || !pendingMaintenanceUnit) return;
+
+        // Record maintenance history
+        await recordMaintenanceReturn(
+            studioId,
+            pendingMaintenanceUnit.equipmentId,
+            pendingMaintenanceUnit.unitId,
+            pendingMaintenanceUnit.previousStatus,
+            currentUser,
+            maintenanceNotes
+        );
+
+        // Update status to REPAIRED
+        await updateUnitStatus(
+            studioId,
+            pendingMaintenanceUnit.equipmentId,
+            pendingMaintenanceUnit.unitId,
+            EquipmentStatus.REPAIRED,
+            currentUser
+        );
+
+        // Close modal
+        setShowMaintenanceModal(false);
+        setPendingMaintenanceUnit(null);
+        setMaintenanceNotes("");
     };
 
     const handleLabelStatusChange = (status: LabelStatus, equipmentId: string, unitId: string) => {
@@ -104,6 +152,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         { value: EquipmentStatus.DAMAGED, label: "損壞", color: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:border-red-600" },
         { value: EquipmentStatus.LOST, label: "遺失", color: "bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100 data-[state=active]:bg-stone-600 data-[state=active]:text-white data-[state=active]:border-stone-600" },
         { value: EquipmentStatus.MAINTENANCE, label: "外出", color: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:border-purple-600" },
+        { value: EquipmentStatus.REPAIRED, label: "已維修", color: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:border-green-600" },
     ];
 
     return (
@@ -217,6 +266,48 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                 className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 確認加入 <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Maintenance Notes Modal */}
+            {showMaintenanceModal && (
+                <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border p-6 space-y-6 animate-in fade-in zoom-in duration-300 relative">
+                        <button
+                            onClick={() => {
+                                setShowMaintenanceModal(false);
+                                setPendingMaintenanceUnit(null);
+                                setMaintenanceNotes("");
+                            }}
+                            className="absolute top-4 right-4 p-1 text-muted-foreground hover:bg-secondary rounded-full"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                        <div className="text-center space-y-2">
+                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
+                                <CheckCircle2 className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-xl font-bold">維修完成歸還</h2>
+                            <p className="text-sm text-muted-foreground">請輸入維修相關備註（選填）</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <textarea
+                                placeholder="例如：更換鏡頭、清潔感光元件、校正白平衡等..."
+                                value={maintenanceNotes}
+                                onChange={e => setMaintenanceNotes(e.target.value)}
+                                className="w-full min-h-[100px] px-4 py-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-none"
+                                autoFocus
+                            />
+
+                            <button
+                                onClick={handleConfirmMaintenance}
+                                className="w-full py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                確認歸還 <CheckCircle2 className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
@@ -356,7 +447,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                                                             return (
                                                                                 <button
                                                                                     key={option.value}
-                                                                                    onClick={() => handleStatusChange(option.value, item.id, activeUnit.id)}
+                                                                                    onClick={() => handleStatusChange(option.value, item.id, activeUnit.id, activeUnit.status)}
                                                                                     data-state={isActive ? 'active' : 'inactive'}
                                                                                     className={cn(
                                                                                         "relative py-3 rounded-xl text-sm font-bold border transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-1",

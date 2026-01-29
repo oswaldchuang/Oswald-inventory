@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Warehouse, CheckCircle2, User } from "lucide-react";
+import { ChevronRight, Warehouse, CheckCircle2, User, History } from "lucide-react";
 import { useInventory } from "@/context/InventoryContext";
 import { EquipmentStatus } from "@/data/types";
 import { cn } from "@/lib/utils";
@@ -103,6 +103,7 @@ export default function Home() {
             let damagedCount = 0;
             let lostCount = 0;
             let outgoingCount = 0;
+            let repairedCount = 0;
             let labelCount = 0;
 
             studios.forEach(s => {
@@ -111,6 +112,7 @@ export default function Home() {
                   if (u.status === '損壞') damagedCount++;
                   if (u.status === '遺失') lostCount++;
                   if (u.status === '外出拍攝') outgoingCount++;
+                  if (u.status === '已維修') repairedCount++;
                   if (u.replacementPending) labelCount++;
                 });
               });
@@ -119,24 +121,34 @@ export default function Home() {
             const stats = [
               { label: '損壞', count: damagedCount, color: 'text-red-600 bg-red-50 border-red-200' },
               { label: '遺失', count: lostCount, color: 'text-stone-600 bg-stone-100 border-stone-200' },
-              { label: '外出', count: outgoingCount, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+              { label: '已維修', count: repairedCount, color: 'text-green-600 bg-green-50 border-green-200' },
               { label: '標籤更換', count: labelCount, color: 'text-orange-600 bg-orange-50 border-orange-200' },
             ];
 
             return (
-              <Link href="/dashboard" className="block">
-                <div className="grid grid-cols-2 gap-3">
-                  {stats.map((stat) => (
-                    <div key={stat.label} className={`flex flex-col items-center justify-center p-4 rounded-xl border ${stat.color} transition-all active:scale-[0.98]`}>
-                      <span className="text-2xl font-bold mb-1">{stat.count}</span>
-                      <span className="text-xs font-medium opacity-80">{stat.label}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-secondary/30 p-2 rounded-lg">
-                  查看詳細報表 <ChevronRight className="w-4 h-4" />
-                </div>
-              </Link>
+              <div className="space-y-4">
+                <Link href="/dashboard" className="block">
+                  <div className="grid grid-cols-2 gap-3">
+                    {stats.map((stat) => (
+                      <div key={stat.label} className={`flex flex-col items-center justify-center p-4 rounded-xl border ${stat.color} transition-all active:scale-[0.98]`}>
+                        <span className="text-2xl font-bold mb-1">{stat.count}</span>
+                        <span className="text-xs font-medium opacity-80">{stat.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-secondary/30 p-2 rounded-lg">
+                    查看詳細報表 <ChevronRight className="w-4 h-4" />
+                  </div>
+                </Link>
+
+                <Link href="/maintenance-history" className="block">
+                  <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl transition-all active:scale-[0.98] hover:bg-green-100">
+                    <History className="w-5 h-5" />
+                    <span className="text-sm font-bold">查看維修歷史記錄</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </Link>
+              </div>
             );
           })()}
         </div>
