@@ -1,13 +1,13 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
-import { 
-  collection, 
-  onSnapshot, 
-  doc, 
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
+import {
+    collection,
+    onSnapshot,
+    doc,
+    updateDoc,
+    arrayUnion,
+    arrayRemove,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Studio, Equipment, EquipmentUnit, EquipmentStatus, LabelStatus } from "@/data/types";
@@ -115,7 +115,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         const equipmentRef = collection(db, "equipment");
         const unsubscribe = onSnapshot(equipmentRef, (snapshot) => {
             const map = new Map<string, Equipment[]>();
-            
+
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 const equipment: Equipment = {
@@ -145,7 +145,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         const unitsRef = collection(db, "equipment_units");
         const unsubscribe = onSnapshot(unitsRef, (snapshot) => {
             const map = new Map<string, EquipmentUnit[]>();
-            
+
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 const unit: EquipmentUnit = {
@@ -178,12 +178,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     const studios = useMemo(() => {
         return rawStudios.map(studio => {
             const equipment = equipmentMap.get(studio.id) || [];
-            
+
             const equipmentWithUnits = equipment.map(eq => ({
                 ...eq,
                 units: unitsMap.get(eq.id) || [],
             }));
-            
+
             return {
                 ...studio,
                 equipment: equipmentWithUnits,
@@ -228,10 +228,10 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         unitId: string,
         checkedBy?: string
     ) => {
-        const studio = studios.find(s => s.id === studioId);
-        const equipment = studio?.equipment.find(e => e.id === equipmentId);
-        const unit = equipment?.units.find(u => u.id === unitId);
-        
+        const studio = studios.find((s: Studio) => s.id === studioId);
+        const equipment = studio?.equipment.find((e: Equipment) => e.id === equipmentId);
+        const unit = equipment?.units.find((u: EquipmentUnit) => u.id === unitId);
+
         if (unit) {
             const unitRef = doc(db, "equipment_units", unitId);
             await updateDoc(unitRef, {
