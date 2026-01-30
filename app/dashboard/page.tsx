@@ -254,13 +254,13 @@ export default function DashboardPage() {
                                     e.units.forEach(u => {
                                         let match = false;
 
-                                        // Base Check: Is it an 'issue' at all?
                                         const isDamaged = u.status === EquipmentStatus.DAMAGED;
                                         const isLost = u.status === EquipmentStatus.LOST;
                                         const isOutgoing = u.status === EquipmentStatus.MAINTENANCE;
                                         const isLabel = u.replacementPending;
+                                        const isUnlabeled = u.labelStatus === LabelStatus.UNLABELED;
 
-                                        if (!isDamaged && !isLost && !isOutgoing && !isLabel) return;
+                                        if (!isDamaged && !isLost && !isOutgoing && !isLabel && !isUnlabeled) return;
 
                                         // Filter Logic
                                         if (filter === 'ALL') match = true;
@@ -268,6 +268,7 @@ export default function DashboardPage() {
                                         else if (filter === 'LOST' && isLost) match = true;
                                         else if (filter === 'OUTGOING' && isOutgoing) match = true;
                                         else if (filter === 'LABEL' && isLabel) match = true;
+                                        else if (filter === 'UNLABELED' && isUnlabeled) match = true;
 
                                         if (match) {
                                             issues.push({ item: e, unit: u });
@@ -330,6 +331,12 @@ export default function DashboardPage() {
                                                                 <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border", getStatusConfig(EquipmentStatus.NORMAL, true).color)}>
                                                                     {getStatusConfig(EquipmentStatus.NORMAL, true).icon}
                                                                     {getStatusConfig(EquipmentStatus.NORMAL, true).label}
+                                                                </div>
+                                                            )}
+                                                            {issue.unit.labelStatus === LabelStatus.UNLABELED && filter === 'UNLABELED' && (
+                                                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border border-amber-200 bg-amber-50 text-amber-700">
+                                                                    <Tag className="w-4 h-4" />
+                                                                    未貼標
                                                                 </div>
                                                             )}
                                                         </div>
