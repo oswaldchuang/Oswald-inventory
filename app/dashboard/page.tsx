@@ -7,7 +7,7 @@ import { useInventory } from "@/context/InventoryContext";
 import { EquipmentStatus, LabelStatus } from "@/data/types";
 import { cn } from "@/lib/utils";
 
-type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'SUMMARY';
+type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'UNLABELED' | 'SUMMARY';
 
 export default function DashboardPage() {
     const { studios } = useInventory();
@@ -45,7 +45,7 @@ export default function DashboardPage() {
         { label: '標籤更換', count: replacementCount, color: 'text-orange-600 bg-orange-50 border-orange-200', icon: <Tag className="w-5 h-5" /> },
         // New cards
         { label: '已貼標', count: labeledCount, color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: <Tag className="w-5 h-5" /> },
-        { label: '未貼標', count: unlabeledCount, color: 'text-amber-600 bg-amber-50 border-amber-200', icon: <Tag className="w-5 h-5" /> },
+        { label: '未貼標', count: unlabeledCount, color: 'text-amber-600 bg-amber-50 border-amber-200', icon: <Tag className="w-5 h-5" />, filterType: 'UNLABELED' as FilterType },
     ];
 
     // Helper to get status color/icon
@@ -64,7 +64,8 @@ export default function DashboardPage() {
         { value: 'DAMAGED', label: "損壞", icon: <AlertCircle className="w-3 h-3" /> },
         { value: 'LOST', label: "遺失", icon: <HelpCircle className="w-3 h-3" /> },
         { value: 'OUTGOING', label: "外出", icon: <ArrowUpRight className="w-3 h-3" /> },
-        { value: 'LABEL', label: "標籤", icon: <Tag className="w-3 h-3" /> },
+        { value: 'LABEL', label: "標籤更換", icon: <Tag className="w-3 h-3" /> },
+        { value: 'UNLABELED', label: "未貼標", icon: <Tag className="w-3 h-3" /> },
         { value: 'SUMMARY', label: "總數統計", icon: <ClipboardList className="w-3 h-3" /> },
     ];
 
@@ -72,7 +73,8 @@ export default function DashboardPage() {
         u.status === EquipmentStatus.DAMAGED ||
         u.status === EquipmentStatus.LOST ||
         u.status === EquipmentStatus.MAINTENANCE ||
-        u.replacementPending
+        u.replacementPending ||
+        u.labelStatus === LabelStatus.UNLABELED
     )));
 
     return (
@@ -120,11 +122,19 @@ export default function DashboardPage() {
                     {/* Stats Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {stats.map((stat) => (
-                            <div key={stat.label} className={`flex flex-col items-center justify-center p-4 rounded-xl border ${stat.color} transition-all`}>
+                            <button
+                                key={stat.label}
+                                onClick={() => stat.filterType && setFilter(stat.filterType)}
+                                disabled={!stat.filterType}
+                                className={cn(
+                                    `flex flex-col items-center justify-center p-4 rounded-xl border ${stat.color} transition-all`,
+                                    stat.filterType ? "hover:scale-[0.98] cursor-pointer" : "cursor-default"
+                                )}
+                            >
                                 <div className="mb-2 opacity-80">{stat.icon}</div>
                                 <span className="text-2xl font-bold mb-1">{stat.count}</span>
                                 <span className="text-xs font-medium opacity-80">{stat.label}</span>
-                            </div>
+                            </button>
                         ))}
                     </div>
 
