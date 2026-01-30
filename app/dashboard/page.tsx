@@ -7,7 +7,7 @@ import { useInventory } from "@/context/InventoryContext";
 import { EquipmentStatus, LabelStatus } from "@/data/types";
 import { cn } from "@/lib/utils";
 
-type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'UNLABELED' | 'SUMMARY';
+type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'UNLABELED' | 'HAS_LABEL' | 'SUMMARY';
 
 export default function DashboardPage() {
     const { studios } = useInventory();
@@ -39,12 +39,12 @@ export default function DashboardPage() {
     });
 
     const stats = [
-        { label: '損壞', count: damagedCount, color: 'text-red-600 bg-red-50 border-red-200', icon: <AlertCircle className="w-5 h-5" /> },
-        { label: '遺失', count: lostCount, color: 'text-stone-600 bg-stone-100 border-stone-200', icon: <HelpCircle className="w-5 h-5" /> },
-        { label: '外出', count: outgoingCount, color: 'text-blue-600 bg-blue-50 border-blue-200', icon: <ArrowUpRight className="w-5 h-5" /> },
-        { label: '標籤更換', count: replacementCount, color: 'text-orange-600 bg-orange-50 border-orange-200', icon: <Tag className="w-5 h-5" /> },
+        { label: '損壞', count: damagedCount, color: 'text-red-600 bg-red-50 border-red-200', icon: <AlertCircle className="w-5 h-5" />, filterType: 'DAMAGED' as FilterType },
+        { label: '遺失', count: lostCount, color: 'text-stone-600 bg-stone-100 border-stone-200', icon: <HelpCircle className="w-5 h-5" />, filterType: 'LOST' as FilterType },
+        { label: '外出', count: outgoingCount, color: 'text-blue-600 bg-blue-50 border-blue-200', icon: <ArrowUpRight className="w-5 h-5" />, filterType: 'OUTGOING' as FilterType },
+        { label: '標籤更換', count: replacementCount, color: 'text-orange-600 bg-orange-50 border-orange-200', icon: <Tag className="w-5 h-5" />, filterType: 'LABEL' as FilterType },
         // New cards
-        { label: '已貼標', count: labeledCount, color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: <Tag className="w-5 h-5" /> },
+        { label: '已貼標', count: labeledCount, color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: <Tag className="w-5 h-5" />, filterType: 'HAS_LABEL' as FilterType },
         { label: '未貼標', count: unlabeledCount, color: 'text-amber-600 bg-amber-50 border-amber-200', icon: <Tag className="w-5 h-5" />, filterType: 'UNLABELED' as FilterType },
     ];
 
@@ -65,6 +65,7 @@ export default function DashboardPage() {
         { value: 'LOST', label: "遺失", icon: <HelpCircle className="w-3 h-3" /> },
         { value: 'OUTGOING', label: "外出", icon: <ArrowUpRight className="w-3 h-3" /> },
         { value: 'LABEL', label: "標籤更換", icon: <Tag className="w-3 h-3" /> },
+        { value: 'HAS_LABEL', label: "已貼標", icon: <Tag className="w-3 h-3" /> },
         { value: 'UNLABELED', label: "未貼標", icon: <Tag className="w-3 h-3" /> },
         { value: 'SUMMARY', label: "總數統計", icon: <ClipboardList className="w-3 h-3" /> },
     ];
@@ -74,7 +75,8 @@ export default function DashboardPage() {
         u.status === EquipmentStatus.LOST ||
         u.status === EquipmentStatus.MAINTENANCE ||
         u.replacementPending ||
-        u.labelStatus === LabelStatus.UNLABELED
+        u.labelStatus === LabelStatus.UNLABELED ||
+        u.labelStatus === LabelStatus.LABELED
     )));
 
     return (
@@ -259,20 +261,32 @@ export default function DashboardPage() {
                                         const isOutgoing = u.status === EquipmentStatus.MAINTENANCE;
                                         const isLabel = u.replacementPending;
                                         const isUnlabeled = u.labelStatus === LabelStatus.UNLABELED;
+                                        const isLabeled = u.labelStatus === LabelStatus.LABELED;
 
-                                        if (!isDamaged && !isLost && !isOutgoing && !isLabel && !isUnlabeled) return;
+                                        // Base check: The logic here is tricky. "HasAnyIssues" controls the empty state. 
+                                        // The loop logic below filters items to display.
+                                        // If we are filtering by 'HAS_LABEL', we want to show labeled items even if they are normal.
+                                        // If we are in 'ALL' mode, typically we show 'issues' only. 
+                                        // If we are in specific filter mode (like DAMAGED), we show damaged.
 
-                                        // Filter Logic
-                                        if (filter === 'ALL') match = true;
-                                        else if (filter === 'DAMAGED' && isDamaged) match = true;
-                                        else if (filter === 'LOST' && isLost) match = true;
-                                        else if (filter === 'OUTGOING' && isOutgoing) match = true;
-                                        else if (filter === 'LABEL' && isLabel) match = true;
-                                        else if (filter === 'UNLABELED' && isUnlabeled) match = true;
+                                        // Revised Logic:
+                                        // 1. If filtering for a specific type, check if it matches that type.
+                                        // 2. If filter is ALL, check if it matches any "Issue" type (excluding Labeled/Normal).
 
-                                        if (match) {
-                                            issues.push({ item: e, unit: u });
-                                        }
+                                        let shouldShow = false;
+
+                                        if (filter === 'ALL') {
+                                            if (isDamaged || isLost || isOutgoing || isLabel || isUnlabeled) shouldShow = true;
+                                        } else if (filter === 'DAMAGED' && isDamaged) shouldShow = true;
+                                        else if (filter === 'LOST' && isLost) shouldShow = true;
+                                        else if (filter === 'OUTGOING' && isOutgoing) shouldShow = true;
+                                        else if (filter === 'LABEL' && isLabel) shouldShow = true;
+                                        else if (filter === 'UNLABELED' && isUnlabeled) shouldShow = true;
+                                        else if (filter === 'HAS_LABEL' && isLabeled) shouldShow = true;
+
+                                        if (!shouldShow) return;
+
+                                        issues.push({ item: e, unit: u });
                                     });
                                 });
 
