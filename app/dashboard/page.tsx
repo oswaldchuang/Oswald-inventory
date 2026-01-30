@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, AlertCircle, HelpCircle, ArrowUpRight, Tag, Layers, ClipboardList, User } from "lucide-react";
 import { useInventory } from "@/context/InventoryContext";
-import { EquipmentStatus } from "@/data/types";
+import { EquipmentStatus, LabelStatus } from "@/data/types";
 import { cn } from "@/lib/utils";
 
 type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'SUMMARY';
@@ -12,6 +12,41 @@ type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'SUMMARY';
 export default function DashboardPage() {
     const { studios } = useInventory();
     const [filter, setFilter] = useState<FilterType>('ALL');
+
+    // Calculate statuses across all studios
+    let damagedCount = 0;
+    let lostCount = 0;
+    let outgoingCount = 0;
+    let replacementCount = 0;
+
+    // New label stats
+    let labeledCount = 0;
+    let unlabeledCount = 0;
+
+    studios.forEach(s => {
+        s.equipment.forEach(e => {
+            e.units.forEach(u => {
+                if (u.status === EquipmentStatus.DAMAGED) damagedCount++;
+                if (u.status === EquipmentStatus.LOST) lostCount++;
+                if (u.status === EquipmentStatus.MAINTENANCE) outgoingCount++;
+                if (u.replacementPending) replacementCount++;
+
+                // Label stats
+                if (u.labelStatus === LabelStatus.LABELED) labeledCount++;
+                if (u.labelStatus === LabelStatus.UNLABELED) unlabeledCount++;
+            });
+        });
+    });
+
+    const stats = [
+        { label: '損壞', count: damagedCount, color: 'text-red-600 bg-red-50 border-red-200', icon: <AlertCircle className="w-5 h-5" /> },
+        { label: '遺失', count: lostCount, color: 'text-stone-600 bg-stone-100 border-stone-200', icon: <HelpCircle className="w-5 h-5" /> },
+        { label: '外出', count: outgoingCount, color: 'text-blue-600 bg-blue-50 border-blue-200', icon: <ArrowUpRight className="w-5 h-5" /> },
+        { label: '標籤更換', count: replacementCount, color: 'text-orange-600 bg-orange-50 border-orange-200', icon: <Tag className="w-5 h-5" /> },
+        // New cards
+        { label: '已貼標', count: labeledCount, color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: <Tag className="w-5 h-5" /> },
+        { label: '未貼標', count: unlabeledCount, color: 'text-amber-600 bg-amber-50 border-amber-200', icon: <Tag className="w-5 h-5" /> },
+    ];
 
     // Helper to get status color/icon
     const getStatusConfig = (status: EquipmentStatus, isReplacement: boolean) => {
@@ -82,6 +117,17 @@ export default function DashboardPage() {
             {/* Content */}
             <main className="flex-1 overflow-y-auto px-4 py-6">
                 <div className="space-y-8">
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {stats.map((stat) => (
+                            <div key={stat.label} className={`flex flex-col items-center justify-center p-4 rounded-xl border ${stat.color} transition-all`}>
+                                <div className="mb-2 opacity-80">{stat.icon}</div>
+                                <span className="text-2xl font-bold mb-1">{stat.count}</span>
+                                <span className="text-xs font-medium opacity-80">{stat.label}</span>
+                            </div>
+                        ))}
+                    </div>
+
                     {filter === 'SUMMARY' ? (
                         // --- Summary View ---
                         <div className="space-y-10">
