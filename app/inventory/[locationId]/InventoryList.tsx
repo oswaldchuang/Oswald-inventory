@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Equipment, EquipmentStatus, LabelStatus } from "@/data/types";
 import { ChevronDown, Circle, CheckCircle2, AlertCircle, Sparkles, Tag, ArrowRight, User, ArrowLeft, Plus, History, X } from "lucide-react";
@@ -51,6 +51,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
     const [nameInput, setNameInput] = useState("");
     const [showNameModal, setShowNameModal] = useState(false);
     const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+    const isComposingRef = useRef(false);
     const [maintenanceNotes, setMaintenanceNotes] = useState("");
     const [pendingMaintenanceUnit, setPendingMaintenanceUnit] = useState<{
         equipmentId: string;
@@ -299,7 +300,18 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                             <textarea
                                 placeholder="例如：更換鏡頭、清潔感光元件、校正白平衡等..."
                                 value={maintenanceNotes}
-                                onChange={e => setMaintenanceNotes(e.target.value)}
+                                onCompositionStart={() => {
+                                    isComposingRef.current = true;
+                                }}
+                                onCompositionEnd={(e) => {
+                                    isComposingRef.current = false;
+                                    setMaintenanceNotes(e.currentTarget.value);
+                                }}
+                                onChange={e => {
+                                    if (!isComposingRef.current) {
+                                        setMaintenanceNotes(e.target.value);
+                                    }
+                                }}
                                 className="w-full min-h-[100px] px-4 py-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-none"
                                 autoFocus
                             />
