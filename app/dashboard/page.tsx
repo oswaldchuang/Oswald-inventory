@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, AlertCircle, HelpCircle, ArrowUpRight, Tag, Layers, ClipboardList, User } from "lucide-react";
+import { ArrowLeft, AlertCircle, HelpCircle, ArrowUpRight, Tag, Layers, ClipboardList, User, FileDown } from "lucide-react";
 import { useInventory } from "@/context/InventoryContext";
 import { EquipmentStatus, LabelStatus } from "@/data/types";
 import { cn } from "@/lib/utils";
+import { exportDashboardToExcel } from "@/lib/exportToExcel";
 
 type FilterType = 'ALL' | 'DAMAGED' | 'LOST' | 'OUTGOING' | 'LABEL' | 'UNLABELED' | 'HAS_LABEL' | 'SUMMARY';
 
@@ -96,6 +97,14 @@ export default function DashboardPage() {
                         </h1>
                         <p className="text-xs text-muted-foreground">異常與待處理項目</p>
                     </div>
+
+                    <button
+                        onClick={() => exportDashboardToExcel(studios)}
+                        className="ml-auto flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-colors shadow-sm"
+                    >
+                        <FileDown className="w-4 h-4" />
+                        <span className="hidden sm:inline">匯出 Excel</span>
+                    </button>
                 </div>
 
                 {/* Filter Tabs */}
