@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Equipment, EquipmentStatus, LabelStatus } from "@/data/types";
-import { ChevronDown, Circle, CheckCircle2, AlertCircle, Sparkles, Tag, ArrowRight, User, ArrowLeft, Plus, History, X } from "lucide-react";
+import { ChevronDown, Circle, CheckCircle2, AlertCircle, Sparkles, Tag, ArrowRight, User, ArrowLeft, Plus, History, X, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useInventory } from "@/context/InventoryContext";
@@ -25,6 +25,8 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         removeStudioAssignee,
         recordMaintenanceReturn,
         addEquipment,
+        addUnitsToEquipment,
+        deleteEquipment,
     } = useInventory();
 
     const studio = studios.find(s => s.id === studioId);
@@ -62,6 +64,9 @@ export default function InventoryList({ studioId }: InventoryListProps) {
 
     // Add Equipment Modal state
     const [showAddEquipmentModal, setShowAddEquipmentModal] = useState(false);
+    // 'new' = build a brand new item, 'existing' = add units to an existing item
+    const [addEquipmentMode, setAddEquipmentMode] = useState<'new' | 'existing'>('new');
+    const [selectedExistingId, setSelectedExistingId] = useState('');
     const [addEquipmentForm, setAddEquipmentForm] = useState({
         name: '',
         category: '',
@@ -72,26 +77,43 @@ export default function InventoryList({ studioId }: InventoryListProps) {
     const [addEquipmentSuccess, setAddEquipmentSuccess] = useState(false);
     const isAddingNameRef = useRef(false);
     const isAddingUnitRef = useRef(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [isDeletingEquipment, setIsDeletingEquipment] = useState(false);
 
     const toggleNameModal = () => setShowNameModal(!showNameModal);
 
     const openAddEquipmentModal = (preselectedCategory: string) => {
         setAddEquipmentForm({ name: '', category: preselectedCategory, quantity: 1, unit: '台' });
+        setAddEquipmentMode('new');
+        setSelectedExistingId('');
         setAddEquipmentSuccess(false);
         setShowAddEquipmentModal(true);
     };
 
     const handleAddEquipment = async () => {
-        if (!addEquipmentForm.name.trim() || isAddingEquipment) return;
+        if (isAddingEquipment) return;
         setIsAddingEquipment(true);
         try {
-            await addEquipment(
-                studioId,
-                addEquipmentForm.name.trim(),
-                addEquipmentForm.category,
-                addEquipmentForm.quantity,
-                addEquipmentForm.unit || '台'
-            );
+            if (addEquipmentMode === 'existing' && selectedExistingId) {
+                const existingItem = equipment.find(e => e.id === selectedExistingId);
+                if (existingItem) {
+                    await addUnitsToEquipment(
+                        existingItem.id,
+                        existingItem.name,
+                        existingItem.quantity,
+                        addEquipmentForm.quantity
+                    );
+                }
+            } else {
+                if (!addEquipmentForm.name.trim()) { setIsAddingEquipment(false); return; }
+                await addEquipment(
+                    studioId,
+                    addEquipmentForm.name.trim(),
+                    addEquipmentForm.category,
+                    addEquipmentForm.quantity,
+                    addEquipmentForm.unit || '台'
+                );
+            }
             setAddEquipmentSuccess(true);
             setTimeout(() => {
                 setShowAddEquipmentModal(false);
@@ -99,6 +121,17 @@ export default function InventoryList({ studioId }: InventoryListProps) {
             }, 1000);
         } finally {
             setIsAddingEquipment(false);
+        }
+    };
+
+    const handleDeleteEquipment = async (equipmentId: string) => {
+        setIsDeletingEquipment(true);
+        try {
+            await deleteEquipment(equipmentId);
+            setExpandedItemId(null);
+            setConfirmDeleteId(null);
+        } finally {
+            setIsDeletingEquipment(false);
         }
     };
 
@@ -384,77 +417,106 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                 <Plus className="w-6 h-6" />
                             </div>
                             <h2 className="text-xl font-bold">新增器材</h2>
-                            <p className="text-sm text-muted-foreground">填寫器材資訊後，系統會自動建立清點項目。</p>
+                        </div>
+
+                        {/* Mode Toggle */}
+                        <div className="flex bg-secondary p-1 rounded-xl">
+                            <button
+                                onClick={() => setAddEquipmentMode('new')}
+                                className={cn("flex-1 py-2 text-sm font-bold rounded-lg transition-all", addEquipmentMode === 'new' ? "bg-white shadow-sm text-foreground" : "text-muted-foreground")}
+                            >
+                                建立新器材
+                            </button>
+                            <button
+                                onClick={() => { setAddEquipmentMode('existing'); if (!selectedExistingId && equipment.length > 0) setSelectedExistingId(equipment[0].id); }}
+                                className={cn("flex-1 py-2 text-sm font-bold rounded-lg transition-all", addEquipmentMode === 'existing' ? "bg-white shadow-sm text-foreground" : "text-muted-foreground")}
+                            >
+                                加入現有項目
+                            </button>
                         </div>
 
                         <div className="space-y-4">
-                            {/* Name */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-muted-foreground">器材名稱 <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
-                                    placeholder="例如：Sony A7S3"
-                                    value={addEquipmentForm.name}
-                                    onCompositionStart={() => { isAddingNameRef.current = true; }}
-                                    onCompositionEnd={() => { isAddingNameRef.current = false; }}
-                                    onChange={(e) => {
-                                        setAddEquipmentForm(prev => ({ ...prev, name: e.target.value }));
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !isAddingNameRef.current) handleAddEquipment();
-                                    }}
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    autoFocus
-                                />
-                            </div>
-
-                            {/* Category */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-muted-foreground">分類</label>
-                                <select
-                                    value={addEquipmentForm.category}
-                                    onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, category: e.target.value }))}
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
-                                >
-                                    {categories.map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                    <option value="其他">其他</option>
-                                </select>
-                            </div>
-
-                            {/* Quantity + Unit */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-muted-foreground">數量</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        max={50}
-                                        value={addEquipmentForm.quantity}
-                                        onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
-                                        className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-muted-foreground">單位</label>
-                                    <input
-                                        type="text"
-                                        placeholder="台"
-                                        value={addEquipmentForm.unit}
-                                        onCompositionStart={() => { isAddingUnitRef.current = true; }}
-                                        onCompositionEnd={() => { isAddingUnitRef.current = false; }}
-                                        onChange={(e) => {
-                                            setAddEquipmentForm(prev => ({ ...prev, unit: e.target.value }));
-                                        }}
-                                        className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    />
-                                </div>
-                            </div>
+                            {addEquipmentMode === 'new' ? (
+                                <>
+                                    {/* Name */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-muted-foreground">器材名稱 <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            placeholder="例如：Sony A7S3"
+                                            value={addEquipmentForm.name}
+                                            onCompositionStart={() => { isAddingNameRef.current = true; }}
+                                            onCompositionEnd={() => { isAddingNameRef.current = false; }}
+                                            onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, name: e.target.value }))}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' && !isAddingNameRef.current) handleAddEquipment(); }}
+                                            className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    {/* Category */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-muted-foreground">分類</label>
+                                        <select
+                                            value={addEquipmentForm.category}
+                                            onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, category: e.target.value }))}
+                                            className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+                                        >
+                                            {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+                                            <option value="其他">其他</option>
+                                        </select>
+                                    </div>
+                                    {/* Quantity + Unit */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-muted-foreground">數量</label>
+                                            <input type="number" min={1} max={50} value={addEquipmentForm.quantity}
+                                                onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-muted-foreground">單位</label>
+                                            <input type="text" placeholder="台" value={addEquipmentForm.unit}
+                                                onCompositionStart={() => { isAddingUnitRef.current = true; }}
+                                                onCompositionEnd={() => { isAddingUnitRef.current = false; }}
+                                                onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, unit: e.target.value }))}
+                                                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Existing item picker */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-muted-foreground">選擇器材項目</label>
+                                        <select
+                                            value={selectedExistingId}
+                                            onChange={(e) => setSelectedExistingId(e.target.value)}
+                                            className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+                                        >
+                                            {equipment.map(eq => (
+                                                <option key={eq.id} value={eq.id}>{eq.name}（目前 {eq.quantity} {eq.unit}）</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {/* Additional quantity */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-muted-foreground">新增數量</label>
+                                        <input type="number" min={1} max={50} value={addEquipmentForm.quantity}
+                                            onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                            className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                                        {selectedExistingId && (() => {
+                                            const eq = equipment.find(e => e.id === selectedExistingId);
+                                            return eq ? <p className="text-xs text-muted-foreground text-center">新增後共 {eq.quantity + addEquipmentForm.quantity} {eq.unit}</p> : null;
+                                        })()}
+                                    </div>
+                                </>
+                            )}
 
                             <button
                                 onClick={handleAddEquipment}
-                                disabled={!addEquipmentForm.name.trim() || isAddingEquipment}
+                                disabled={(
+                                    addEquipmentMode === 'new' ? !addEquipmentForm.name.trim() : !selectedExistingId
+                                ) || isAddingEquipment}
                                 className={cn(
                                     "w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2",
                                     addEquipmentSuccess
@@ -463,11 +525,9 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                 )}
                             >
                                 {addEquipmentSuccess ? (
-                                    <><CheckCircle2 className="w-4 h-4" /> 新增成功！</>
-                                ) : isAddingEquipment ? (
-                                    '新增中...'
-                                ) : (
-                                    <><Plus className="w-4 h-4" /> 確認新增</>
+                                    <><CheckCircle2 className="w-4 h-4" /> {addEquipmentMode === 'existing' ? '新增台數成功！' : '新增成功！'}</>
+                                ) : isAddingEquipment ? '處理中...' : (
+                                    <><Plus className="w-4 h-4" /> {addEquipmentMode === 'existing' ? '確認加入台數' : '確認新增'}</>
                                 )}
                             </button>
                         </div>
@@ -724,6 +784,38 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                                                         className="w-full min-h-[80px] p-3 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
                                                                     />
                                                                 </div>
+
+                                                                {/* 7. Delete Equipment */}
+                                                                {confirmDeleteId === item.id ? (
+                                                                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                                                                        <p className="text-sm font-bold text-red-700 text-center">確定要刪除「{item.name}」嗎？</p>
+                                                                        <p className="text-xs text-red-500 text-center">此操作無法復原，所有清點紀錄也會一併刪除。</p>
+                                                                        <div className="flex gap-2">
+                                                                            <button
+                                                                                onClick={() => setConfirmDeleteId(null)}
+                                                                                className="flex-1 py-2 rounded-lg border border-border text-sm font-bold text-muted-foreground hover:bg-secondary transition-colors"
+                                                                            >
+                                                                                取消
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteEquipment(item.id)}
+                                                                                disabled={isDeletingEquipment}
+                                                                                className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                                {isDeletingEquipment ? '刪除中...' : '確認刪除'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => setConfirmDeleteId(item.id)}
+                                                                        className="w-full py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                        刪除此器材
+                                                                    </button>
+                                                                )}
 
                                                             </div>
                                                         </motion.div>

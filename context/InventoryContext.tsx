@@ -74,6 +74,13 @@ interface InventoryContextType {
         quantity: number,
         unit: string
     ) => Promise<void>;
+    addUnitsToEquipment: (
+        equipmentId: string,
+        equipmentName: string,
+        currentQuantity: number,
+        additionalQuantity: number
+    ) => Promise<void>;
+    deleteEquipment: (equipmentId: string) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -427,6 +434,57 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const addUnitsToEquipment = async (
+        equipmentId: string,
+        equipmentName: string,
+        currentQuantity: number,
+        additionalQuantity: number
+    ) => {
+        // Add new unit documents
+        for (let i = 0; i < additionalQuantity; i++) {
+            const newIndex = currentQuantity + i;
+            const unitId = `${equipmentId}_unit_${newIndex + 1}_${Date.now() + i}`;
+            await addDoc(collection(db, "equipment_units"), {
+                id: unitId,
+                equipmentId,
+                unitIndex: newIndex,
+                unitLabel: `${equipmentName}-${String(newIndex + 1).padStart(2, '0')}`,
+                status: EquipmentStatus.UNCHECKED,
+                labelStatus: LabelStatus.UNLABELED,
+                remark: '',
+                labelRemark: '',
+                replacementPending: false,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+            });
+        }
+        // Update the equipment quantity
+        const { getDocs, query, where } = await import('firebase/firestore');
+        const q = query(collection(db, "equipment"), where("id", "==", equipmentId));
+        const snap = await getDocs(q);
+        snap.forEach(async (d) => {
+            await updateDoc(doc(db, "equipment", d.id), {
+                quantity: currentQuantity + additionalQuantity,
+                updatedAt: new Date(),
+            });
+        });
+    };
+
+    const deleteEquipment = async (equipmentId: string) => {
+        const { getDocs, query, where } = await import('firebase/firestore');
+        // Delete all equipment_units
+        const unitsQ = query(collection(db, "equipment_units"), where("equipmentId", "==", equipmentId));
+        const unitsSnap = await getDocs(unitsQ);
+        const unitDeletes = unitsSnap.docs.map(d => deleteDoc(doc(db, "equipment_units", d.id)));
+        await Promise.all(unitDeletes);
+        // Delete the equipment itself
+        const equipQ = query(collection(db, "equipment"), where("id", "==", equipmentId));
+        const equipSnap = await getDocs(equipQ);
+        equipSnap.forEach(async (d) => {
+            await deleteDoc(doc(db, "equipment", d.id));
+        });
+    };
+
     const deleteMaintenanceRecord = async (recordId: string) => {
         try {
             // Find the document in maintenance_history collection
@@ -481,6 +539,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             recordMaintenanceReturn,
             deleteMaintenanceRecord,
             addEquipment,
+            addUnitsToEquipment,
+            deleteEquipment,
         }}>
             {children}
         </InventoryContext.Provider>
