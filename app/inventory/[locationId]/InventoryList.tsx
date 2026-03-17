@@ -102,11 +102,18 @@ export default function InventoryList({ studioId }: InventoryListProps) {
             if (addEquipmentMode === 'existing' && selectedExistingId) {
                 const existingItem = equipment.find(e => e.id === selectedExistingId);
                 if (existingItem) {
+                    // Try to extract the last unit's label to continue the numbering
+                    const lastUnit = existingItem.units.length > 0
+                        ? existingItem.units[existingItem.units.length - 1]
+                        : null;
+                    const lastUnitLabel = lastUnit ? (lastUnit.unitLabel || lastUnit.id) : undefined;
+
                     await addUnitsToEquipment(
                         existingItem.id,
                         existingItem.name,
                         existingItem.quantity,
-                        addEquipmentForm.quantity
+                        addEquipmentForm.quantity,
+                        lastUnitLabel
                     );
                 }
             } else {

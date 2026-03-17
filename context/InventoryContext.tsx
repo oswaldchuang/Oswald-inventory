@@ -78,7 +78,8 @@ interface InventoryContextType {
         equipmentId: string,
         equipmentName: string,
         currentQuantity: number,
-        additionalQuantity: number
+        additionalQuantity: number,
+        lastUnitLabel?: string
     ) => Promise<void>;
     deleteEquipment: (equipmentId: string) => Promise<void>;
     deleteUnit: (unitId: string, equipmentId: string, isLastUnit: boolean) => Promise<void>;
@@ -440,17 +441,33 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         equipmentId: string,
         equipmentName: string,
         currentQuantity: number,
-        additionalQuantity: number
+        additionalQuantity: number,
+        lastUnitLabel?: string
     ) => {
+        // Generate a new label by incrementing the trailing number of the last label
+        const generateNextLabel = (baseLabel: string, offset: number): string => {
+            const match = baseLabel.match(/^(.*?)(-?)(\d+)$/);
+            if (match) {
+                const [, prefix, separator, numStr] = match;
+                const newNum = parseInt(numStr) + offset;
+                return `${prefix}${separator}${String(newNum).padStart(numStr.length, '0')}`;
+            }
+            // No trailing number found, fall back to name + index
+            return `${equipmentName}-${String(currentQuantity + offset).padStart(2, '0')}`;
+        };
+
         // Add new unit documents
         for (let i = 0; i < additionalQuantity; i++) {
             const newIndex = currentQuantity + i;
             const unitId = `${equipmentId}_unit_${newIndex + 1}_${Date.now() + i}`;
+            const unitLabel = lastUnitLabel
+                ? generateNextLabel(lastUnitLabel, i + 1)
+                : `${equipmentName}-${String(newIndex + 1).padStart(2, '0')}`;
             await addDoc(collection(db, "equipment_units"), {
                 id: unitId,
                 equipmentId,
                 unitIndex: newIndex,
-                unitLabel: `${equipmentName}-${String(newIndex + 1).padStart(2, '0')}`,
+                unitLabel,
                 status: EquipmentStatus.UNCHECKED,
                 labelStatus: LabelStatus.UNLABELED,
                 remark: '',
