@@ -23,7 +23,8 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         updateUnitRemark,
         addStudioAssignee,
         removeStudioAssignee,
-        recordMaintenanceReturn
+        recordMaintenanceReturn,
+        addEquipment,
     } = useInventory();
 
     const studio = studios.find(s => s.id === studioId);
@@ -59,7 +60,47 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         previousStatus: EquipmentStatus;
     } | null>(null);
 
+    // Add Equipment Modal state
+    const [showAddEquipmentModal, setShowAddEquipmentModal] = useState(false);
+    const [addEquipmentForm, setAddEquipmentForm] = useState({
+        name: '',
+        category: '',
+        quantity: 1,
+        unit: '台',
+    });
+    const [isAddingEquipment, setIsAddingEquipment] = useState(false);
+    const [addEquipmentSuccess, setAddEquipmentSuccess] = useState(false);
+    const isAddingNameRef = useRef(false);
+    const isAddingUnitRef = useRef(false);
+
     const toggleNameModal = () => setShowNameModal(!showNameModal);
+
+    const openAddEquipmentModal = (preselectedCategory: string) => {
+        setAddEquipmentForm({ name: '', category: preselectedCategory, quantity: 1, unit: '台' });
+        setAddEquipmentSuccess(false);
+        setShowAddEquipmentModal(true);
+    };
+
+    const handleAddEquipment = async () => {
+        if (!addEquipmentForm.name.trim() || isAddingEquipment) return;
+        setIsAddingEquipment(true);
+        try {
+            await addEquipment(
+                studioId,
+                addEquipmentForm.name.trim(),
+                addEquipmentForm.category,
+                addEquipmentForm.quantity,
+                addEquipmentForm.unit || '台'
+            );
+            setAddEquipmentSuccess(true);
+            setTimeout(() => {
+                setShowAddEquipmentModal(false);
+                setAddEquipmentSuccess(false);
+            }, 1000);
+        } finally {
+            setIsAddingEquipment(false);
+        }
+    };
 
     const toggleExpand = (id: string) => {
         if (expandedItemId === id) {
@@ -327,6 +368,123 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                 </div>
             )}
 
+            {/* Add Equipment Modal */}
+            {showAddEquipmentModal && (
+                <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border p-6 space-y-5 animate-in fade-in zoom-in duration-300 relative">
+                        <button
+                            onClick={() => setShowAddEquipmentModal(false)}
+                            className="absolute top-4 right-4 p-1 text-muted-foreground hover:bg-secondary rounded-full"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+
+                        <div className="text-center space-y-2">
+                            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                                <Plus className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-xl font-bold">新增器材</h2>
+                            <p className="text-sm text-muted-foreground">填寫器材資訊後，系統會自動建立清點項目。</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Name */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-muted-foreground">器材名稱 <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    placeholder="例如：Sony A7S3"
+                                    value={addEquipmentForm.name}
+                                    onCompositionStart={() => { isAddingNameRef.current = true; }}
+                                    onCompositionEnd={(e) => {
+                                        isAddingNameRef.current = false;
+                                        setAddEquipmentForm(prev => ({ ...prev, name: e.currentTarget.value }));
+                                    }}
+                                    onChange={(e) => {
+                                        if (!isAddingNameRef.current) {
+                                            setAddEquipmentForm(prev => ({ ...prev, name: e.target.value }));
+                                        }
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !isAddingNameRef.current) handleAddEquipment();
+                                    }}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* Category */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-muted-foreground">分類</label>
+                                <select
+                                    value={addEquipmentForm.category}
+                                    onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, category: e.target.value }))}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+                                >
+                                    {categories.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                    <option value="其他">其他</option>
+                                </select>
+                            </div>
+
+                            {/* Quantity + Unit */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground">數量</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={50}
+                                        value={addEquipmentForm.quantity}
+                                        onChange={(e) => setAddEquipmentForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                        className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground">單位</label>
+                                    <input
+                                        type="text"
+                                        placeholder="台"
+                                        value={addEquipmentForm.unit}
+                                        onCompositionStart={() => { isAddingUnitRef.current = true; }}
+                                        onCompositionEnd={(e) => {
+                                            isAddingUnitRef.current = false;
+                                            setAddEquipmentForm(prev => ({ ...prev, unit: e.currentTarget.value }));
+                                        }}
+                                        onChange={(e) => {
+                                            if (!isAddingUnitRef.current) {
+                                                setAddEquipmentForm(prev => ({ ...prev, unit: e.target.value }));
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleAddEquipment}
+                                disabled={!addEquipmentForm.name.trim() || isAddingEquipment}
+                                className={cn(
+                                    "w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2",
+                                    addEquipmentSuccess
+                                        ? "bg-green-500 text-white"
+                                        : "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                                )}
+                            >
+                                {addEquipmentSuccess ? (
+                                    <><CheckCircle2 className="w-4 h-4" /> 新增成功！</>
+                                ) : isAddingEquipment ? (
+                                    '新增中...'
+                                ) : (
+                                    <><Plus className="w-4 h-4" /> 確認新增</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className={cn(
                 "flex-1 overflow-y-auto px-4 py-6 transition-all duration-300",
                 !currentUser && "opacity-50 pointer-events-none grayscale-[0.5]"
@@ -337,8 +495,16 @@ export default function InventoryList({ studioId }: InventoryListProps) {
 
                         return (
                             <div key={category} className="space-y-3">
-                                <h2 className="text-sm font-semibold text-muted-foreground px-1 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/50">
-                                    {category}
+                                <h2 className="text-sm font-semibold text-muted-foreground px-1 sticky top-0 bg-background/95 backdrop-blur py-2 z-10 border-b border-border/50 flex items-center justify-between">
+                                    <span>{category}</span>
+                                    <button
+                                        onClick={() => openAddEquipmentModal(category)}
+                                        className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                        title={`在「${category}」新增器材`}
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                        新增
+                                    </button>
                                 </h2>
 
                                 <div className="flex flex-col gap-3">

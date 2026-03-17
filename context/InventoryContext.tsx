@@ -67,6 +67,13 @@ interface InventoryContextType {
         notes?: string
     ) => Promise<void>;
     deleteMaintenanceRecord: (recordId: string) => Promise<void>;
+    addEquipment: (
+        studioId: string,
+        name: string,
+        category: string,
+        quantity: number,
+        unit: string
+    ) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -374,6 +381,52 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const addEquipment = async (
+        studioId: string,
+        name: string,
+        category: string,
+        quantity: number,
+        unit: string
+    ) => {
+        // Generate a slug-like ID from the name
+        const slug = name
+            .toLowerCase()
+            .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 30);
+        const equipmentId = `${studioId}_${slug}_${Date.now()}`;
+
+        // Write equipment document
+        await addDoc(collection(db, "equipment"), {
+            id: equipmentId,
+            name,
+            category,
+            quantity,
+            unit,
+            studioId,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+        });
+
+        // Write equipment_units documents
+        for (let i = 0; i < quantity; i++) {
+            const unitId = `${equipmentId}_unit_${i + 1}`;
+            await addDoc(collection(db, "equipment_units"), {
+                id: unitId,
+                equipmentId,
+                unitIndex: i,
+                unitLabel: `${name}-${String(i + 1).padStart(2, '0')}`,
+                status: EquipmentStatus.UNCHECKED,
+                labelStatus: LabelStatus.UNLABELED,
+                remark: '',
+                labelRemark: '',
+                replacementPending: false,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+            });
+        }
+    };
+
     const deleteMaintenanceRecord = async (recordId: string) => {
         try {
             // Find the document in maintenance_history collection
@@ -426,7 +479,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             addToUserHistory,
             maintenanceHistory,
             recordMaintenanceReturn,
-            deleteMaintenanceRecord
+            deleteMaintenanceRecord,
+            addEquipment,
         }}>
             {children}
         </InventoryContext.Provider>
