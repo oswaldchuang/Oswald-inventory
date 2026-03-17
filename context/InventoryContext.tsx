@@ -82,6 +82,7 @@ interface InventoryContextType {
     ) => Promise<void>;
     deleteEquipment: (equipmentId: string) => Promise<void>;
     deleteUnit: (unitId: string, equipmentId: string, isLastUnit: boolean) => Promise<void>;
+    updateUnitLabel: (equipmentId: string, unitId: string, newLabel: string) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -486,6 +487,18 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const updateUnitLabel = async (equipmentId: string, unitId: string, newLabel: string) => {
+        const { getDocs, query, where } = await import('firebase/firestore');
+        const q = query(collection(db, "equipment_units"), where("id", "==", unitId));
+        const snap = await getDocs(q);
+        snap.forEach(async (d) => {
+            await updateDoc(doc(db, "equipment_units", d.id), {
+                unitLabel: newLabel.trim(),
+                updatedAt: new Date(),
+            });
+        });
+    };
+
     const deleteUnit = async (unitId: string, equipmentId: string, isLastUnit: boolean) => {
         const { getDocs, query, where } = await import('firebase/firestore');
         // Delete the specific unit
@@ -569,6 +582,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             addUnitsToEquipment,
             deleteEquipment,
             deleteUnit,
+            updateUnitLabel,
         }}>
             {children}
         </InventoryContext.Provider>

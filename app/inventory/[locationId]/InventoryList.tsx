@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Equipment, EquipmentStatus, LabelStatus } from "@/data/types";
-import { ChevronDown, Circle, CheckCircle2, AlertCircle, Sparkles, Tag, ArrowRight, User, ArrowLeft, Plus, History, X, Trash2 } from "lucide-react";
+import { ChevronDown, Circle, CheckCircle2, AlertCircle, Sparkles, Tag, ArrowRight, User, ArrowLeft, Plus, History, X, Trash2, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useInventory } from "@/context/InventoryContext";
@@ -28,6 +28,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         addUnitsToEquipment,
         deleteEquipment,
         deleteUnit,
+        updateUnitLabel,
     } = useInventory();
 
     const studio = studios.find(s => s.id === studioId);
@@ -80,6 +81,9 @@ export default function InventoryList({ studioId }: InventoryListProps) {
     const isAddingUnitRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [isDeletingEquipment, setIsDeletingEquipment] = useState(false);
+    const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+    const [editingLabelValue, setEditingLabelValue] = useState('');
+    const isEditingLabelRef = useRef(false);
 
     const toggleNameModal = () => setShowNameModal(!showNameModal);
 
@@ -662,9 +666,40 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                                                             {activeUnit.status === EquipmentStatus.UNCHECKED ? '未清點' : activeUnit.status}
                                                                         </span>
                                                                     </div>
-                                                                    <p className="text-lg font-bold text-foreground font-mono tracking-tight">
-                                                                        {activeUnit.unitLabel || activeUnit.id}
-                                                                    </p>
+                                                                    {/* Editable label name */}
+                                                                    {editingLabelId === activeUnit.id ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingLabelValue}
+                                                                            autoFocus
+                                                                            onCompositionStart={() => { isEditingLabelRef.current = true; }}
+                                                                            onCompositionEnd={() => { isEditingLabelRef.current = false; }}
+                                                                            onChange={(e) => setEditingLabelValue(e.target.value)}
+                                                                            onKeyDown={async (e) => {
+                                                                                if (e.key === 'Enter' && !isEditingLabelRef.current) {
+                                                                                    if (editingLabelValue.trim()) await updateUnitLabel(item.id, activeUnit.id, editingLabelValue);
+                                                                                    setEditingLabelId(null);
+                                                                                } else if (e.key === 'Escape') {
+                                                                                    setEditingLabelId(null);
+                                                                                }
+                                                                            }}
+                                                                            onBlur={async () => {
+                                                                                if (editingLabelValue.trim()) await updateUnitLabel(item.id, activeUnit.id, editingLabelValue);
+                                                                                setEditingLabelId(null);
+                                                                            }}
+                                                                            className="text-lg font-bold text-foreground font-mono tracking-tight w-full px-2 py-1 rounded-lg border border-blue-300 bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                                                                        />
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => { setEditingLabelId(activeUnit.id); setEditingLabelValue(activeUnit.unitLabel || activeUnit.id); }}
+                                                                            className="flex items-center gap-2 group/label text-left"
+                                                                        >
+                                                                            <p className="text-lg font-bold text-foreground font-mono tracking-tight">
+                                                                                {activeUnit.unitLabel || activeUnit.id}
+                                                                            </p>
+                                                                            <Pencil className="w-3.5 h-3.5 text-muted-foreground/40 group-hover/label:text-blue-400 transition-colors" />
+                                                                        </button>
+                                                                    )}
                                                                     {activeUnit.checkedBy && (
                                                                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                                                                             <User className="w-3 h-3" />
