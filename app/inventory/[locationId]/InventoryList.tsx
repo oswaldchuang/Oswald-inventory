@@ -27,6 +27,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         addEquipment,
         addUnitsToEquipment,
         deleteEquipment,
+        deleteUnit,
     } = useInventory();
 
     const studio = studios.find(s => s.id === studioId);
@@ -124,11 +125,16 @@ export default function InventoryList({ studioId }: InventoryListProps) {
         }
     };
 
-    const handleDeleteEquipment = async (equipmentId: string) => {
+    const handleDeleteUnit = async (equipmentId: string, unitId: string, isLastUnit: boolean) => {
         setIsDeletingEquipment(true);
         try {
-            await deleteEquipment(equipmentId);
-            setExpandedItemId(null);
+            await deleteUnit(unitId, equipmentId, isLastUnit);
+            if (isLastUnit) {
+                setExpandedItemId(null);
+            } else {
+                // Go back to previous unit if possible
+                setSelectedUnitIndex(prev => Math.max(0, prev - 1));
+            }
             setConfirmDeleteId(null);
         } finally {
             setIsDeletingEquipment(false);
@@ -785,11 +791,20 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                                                     />
                                                                 </div>
 
-                                                                {/* 7. Delete Equipment */}
+                                                                {/* 7. Delete Unit / Equipment */}
                                                                 {confirmDeleteId === item.id ? (
                                                                     <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
-                                                                        <p className="text-sm font-bold text-red-700 text-center">確定要刪除「{item.name}」嗎？</p>
-                                                                        <p className="text-xs text-red-500 text-center">此操作無法復原，所有清點紀錄也會一併刪除。</p>
+                                                                        {item.units.length === 1 ? (
+                                                                            <>
+                                                                                <p className="text-sm font-bold text-red-700 text-center">確定要刪除「{item.name}」嗎？</p>
+                                                                                <p className="text-xs text-red-500 text-center">這是最後一個標籤，整個器材項目將被移除。</p>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <p className="text-sm font-bold text-red-700 text-center">確定要刪除標籤「{activeUnit.unitLabel}」嗎？</p>
+                                                                                <p className="text-xs text-red-500 text-center">其餘 {item.units.length - 1} 個標籤不受影響。</p>
+                                                                            </>
+                                                                        )}
                                                                         <div className="flex gap-2">
                                                                             <button
                                                                                 onClick={() => setConfirmDeleteId(null)}
@@ -798,7 +813,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                                                                 取消
                                                                             </button>
                                                                             <button
-                                                                                onClick={() => handleDeleteEquipment(item.id)}
+                                                                                onClick={() => handleDeleteUnit(item.id, activeUnit.id, item.units.length === 1)}
                                                                                 disabled={isDeletingEquipment}
                                                                                 className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
                                                                             >
@@ -813,7 +828,7 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                                                         className="w-full py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
                                                                     >
                                                                         <Trash2 className="w-4 h-4" />
-                                                                        刪除此器材
+                                                                        {item.units.length === 1 ? '刪除此器材' : `刪除此標籤（${activeUnit.unitLabel}）`}
                                                                     </button>
                                                                 )}
 

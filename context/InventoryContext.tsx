@@ -81,6 +81,7 @@ interface InventoryContextType {
         additionalQuantity: number
     ) => Promise<void>;
     deleteEquipment: (equipmentId: string) => Promise<void>;
+    deleteUnit: (unitId: string, equipmentId: string, isLastUnit: boolean) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -485,6 +486,32 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const deleteUnit = async (unitId: string, equipmentId: string, isLastUnit: boolean) => {
+        const { getDocs, query, where } = await import('firebase/firestore');
+        // Delete the specific unit
+        const unitQ = query(collection(db, "equipment_units"), where("id", "==", unitId));
+        const unitSnap = await getDocs(unitQ);
+        await Promise.all(unitSnap.docs.map(d => deleteDoc(doc(db, "equipment_units", d.id))));
+
+        if (isLastUnit) {
+            // Delete the equipment itself too
+            const equipQ = query(collection(db, "equipment"), where("id", "==", equipmentId));
+            const equipSnap = await getDocs(equipQ);
+            await Promise.all(equipSnap.docs.map(d => deleteDoc(doc(db, "equipment", d.id))));
+        } else {
+            // Decrement quantity by 1
+            const equipQ = query(collection(db, "equipment"), where("id", "==", equipmentId));
+            const equipSnap = await getDocs(equipQ);
+            equipSnap.forEach(async (d) => {
+                const currentQty = d.data().quantity ?? 1;
+                await updateDoc(doc(db, "equipment", d.id), {
+                    quantity: Math.max(0, currentQty - 1),
+                    updatedAt: new Date(),
+                });
+            });
+        }
+    };
+
     const deleteMaintenanceRecord = async (recordId: string) => {
         try {
             // Find the document in maintenance_history collection
@@ -541,6 +568,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             addEquipment,
             addUnitsToEquipment,
             deleteEquipment,
+            deleteUnit,
         }}>
             {children}
         </InventoryContext.Provider>
