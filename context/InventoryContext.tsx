@@ -9,6 +9,7 @@ import {
     arrayUnion,
     arrayRemove,
     addDoc,
+    setDoc,
     deleteDoc,
     Timestamp,
 } from "firebase/firestore";
@@ -407,7 +408,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         const equipmentId = `${studioId}_${slug}_${Date.now()}`;
 
         // Write equipment document
-        await addDoc(collection(db, "equipment"), {
+        await setDoc(doc(db, "equipment", equipmentId), {
             id: equipmentId,
             name,
             category,
@@ -421,7 +422,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
         // Write equipment_units documents
         for (let i = 0; i < quantity; i++) {
             const unitId = `${equipmentId}_unit_${i + 1}`;
-            await addDoc(collection(db, "equipment_units"), {
+            await setDoc(doc(db, "equipment_units", unitId), {
                 id: unitId,
                 equipmentId,
                 unitIndex: i,
@@ -463,7 +464,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
             const unitLabel = lastUnitLabel
                 ? generateNextLabel(lastUnitLabel, i + 1)
                 : `${equipmentName}-${String(newIndex + 1).padStart(2, '0')}`;
-            await addDoc(collection(db, "equipment_units"), {
+            await setDoc(doc(db, "equipment_units", unitId), {
                 id: unitId,
                 equipmentId,
                 unitIndex: newIndex,
