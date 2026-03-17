@@ -396,14 +396,9 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                     placeholder="例如：Sony A7S3"
                                     value={addEquipmentForm.name}
                                     onCompositionStart={() => { isAddingNameRef.current = true; }}
-                                    onCompositionEnd={(e) => {
-                                        isAddingNameRef.current = false;
-                                        setAddEquipmentForm(prev => ({ ...prev, name: e.currentTarget.value }));
-                                    }}
+                                    onCompositionEnd={() => { isAddingNameRef.current = false; }}
                                     onChange={(e) => {
-                                        if (!isAddingNameRef.current) {
-                                            setAddEquipmentForm(prev => ({ ...prev, name: e.target.value }));
-                                        }
+                                        setAddEquipmentForm(prev => ({ ...prev, name: e.target.value }));
                                     }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !isAddingNameRef.current) handleAddEquipment();
@@ -448,14 +443,9 @@ export default function InventoryList({ studioId }: InventoryListProps) {
                                         placeholder="台"
                                         value={addEquipmentForm.unit}
                                         onCompositionStart={() => { isAddingUnitRef.current = true; }}
-                                        onCompositionEnd={(e) => {
-                                            isAddingUnitRef.current = false;
-                                            setAddEquipmentForm(prev => ({ ...prev, unit: e.currentTarget.value }));
-                                        }}
+                                        onCompositionEnd={() => { isAddingUnitRef.current = false; }}
                                         onChange={(e) => {
-                                            if (!isAddingUnitRef.current) {
-                                                setAddEquipmentForm(prev => ({ ...prev, unit: e.target.value }));
-                                            }
+                                            setAddEquipmentForm(prev => ({ ...prev, unit: e.target.value }));
                                         }}
                                         className="w-full px-4 py-3 rounded-xl border border-border bg-background text-base text-center font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
                                     />
